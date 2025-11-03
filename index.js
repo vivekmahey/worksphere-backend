@@ -12,7 +12,6 @@ const app = express();
 const server = http.createServer(app);
 const io = new Server(server, {
   cors: {
-    // This is fine, but the app.use(cors()) below is more important
     origin: ['http://localhost:5173', 'https://worksphere-backend-zoiw.onrender.com'],
     methods: ['GET', 'POST', 'PATCH', 'DELETE'],
   },
