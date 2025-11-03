@@ -1,0 +1,198 @@
+# ================================
+# Logs and Debug
+# ================================
+logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+
+# Diagnostic reports (https://nodejs.org/api/report.html)
+report.[0-9]*.[0-9]*.[0-9]*.[0-9]*.json
+
+# ================================
+# Runtime data
+# ================================
+pids
+*.pid
+*.seed
+*.pid.lock
+
+# ================================
+# Dependency directories
+# ================================
+node_modules/
+jspm_packages/
+
+# ================================
+# Build outputs
+# ================================
+dist/
+dist-ssr/
+build/
+.cache/
+.next/
+out/
+public/build/
+coverage/
+.tmp/
+temp/
+.vite/
+vite-dist/
+*.local
+
+# ================================
+# Environment files
+# ================================
+.env
+.env.*.local
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+
+# ================================
+# IDE and Editor settings
+# ================================
+.vscode/*
+!.vscode/extensions.json
+.idea/
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+*.iml
+*.code-workspace
+
+# ================================
+# OS generated files
+# ================================
+.DS_Store
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+$RECYCLE.BIN/
+
+# ================================
+# Package managers
+# ================================
+.pnpm-store/
+.yarn/
+.yarn-cache/
+.yarn-integrity
+.yarnrc.yml
+.yarnclean
+.npm/
+.npmrc
+.bun/
+
+# ================================
+# TypeScript / JS Transpilation
+# ================================
+*.tsbuildinfo
+*.tscache
+*.eslintcache
+*.babelrc
+*.babelrc.js
+*.babelrc.json
+*.prettierignore
+*.stylelintcache
+
+# ================================
+# Logs / Testing
+# ================================
+coverage/
+*.lcov
+jest-html-reporters-*
+
+# ================================
+# OS / Misc
+# ================================
+*.tgz
+*.bak
+*.orig
+*.rej
+*.tmp
+*.temp
+*.old
+*.log.old
+*~
+*.swp
+
+# ================================
+# Local servers / databases
+# ================================
+data/
+sqlite.db
+*.sqlite
+*.sqlite3
+*.db
+dump.rdb
+
+# ================================
+# Firebase / Cloud / Misc Tools
+# ================================
+.firebase/
+functions/lib/
+.functions/
+.firebaserc
+firebase-debug.log
+firebase-debug.*
+storage.rules
+
+# ================================
+# React / Vite Specific
+# ================================
+*.cache
+vite.config.timestamp-*
+vite.config.ts.timestamp-*
+vite-plugin-*
+vite.env.d.ts
+.sass-cache/
+.stylelintcache
+.eslintcache
+
+# ================================
+# Lockfiles (optional — uncomment if you prefer not to commit)
+# ================================
+# package-lock.json
+# yarn.lock
+# pnpm-lock.yaml
+
+# ================================
+# Local test files or mock data
+# ================================
+__tests__/
+__mocks__/
+test-results/
+*.spec.js
+*.test.js
+*.spec.ts
+*.test.ts
+*.spec.jsx
+*.test.jsx
+*.spec.tsx
+*.test.tsx
+
+# ================================
+# Others
+# ================================
+*.bak
+*.tmp
+*.temp
+*.log
+*.log.*
+*.crt
+*.pem
+*.key
+*.csr
+
+# ================================
+# JetBrains / WebStorm specific
+# ================================
+.idea/
+*.iml
+out/
