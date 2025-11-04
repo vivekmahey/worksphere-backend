@@ -7,7 +7,7 @@ const Tab = require('../models/Tab');
 
 router.post('/tabs', (req, res) => {
   console.log('=== UPLOAD STARTED ===');
-  const busboy = Busboy({ headers: req.headers, limits: { fileSize: 200 * 1024 * 1024, files: 1 } });
+  const busboy = Busboy({ headers: req.headers, limits: { fileSize: 300 * 1024 * 1024, files: 1 } });
 
   let name, type, fileBuffer, fileName;
   let finished = false;
