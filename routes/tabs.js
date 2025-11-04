@@ -1,15 +1,15 @@
-// worksphere-backend/routes/tabs.js
 const express = require('express');
 const router = express.Router();
 const Busboy = require('busboy');
-const fetch = require('node-fetch'); // npm install node-fetch
-const Tab = require('../models/Tab');
+const fetch = require('node-fetch');
+const Tab = require('../models/Tab'); // Our Tab model
 
+// POST A NEW TAB
 router.post('/tabs', (req, res) => {
   console.log('=== UPLOAD STARTED ===');
-  const busboy = Busboy({ headers: req.headers, limits: { fileSize: 300 * 1024 * 1024, files: 1 } });
+  const busboy = Busboy({ headers: req.headers, limits: { fileSize: 200 * 1024 * 1024, files: 1 } });
 
-  let name, type, fileBuffer, fileName;
+  let name, type, fileBuffer;
   let finished = false;
 
   const done = () => {
@@ -18,17 +18,23 @@ router.post('/tabs', (req, res) => {
 
     if (!name || !type) return res.status(400).json({ error: 'Name and type required' });
 
-    const tabData = { name, type, status: 'active' };
+    const tabData = {
+      userId: 'test-user',
+      name,
+      type,
+      status: 'active',
+    };
     if (fileBuffer) tabData.fileData = fileBuffer;
 
     (async () => {
       try {
-        let doc = await Tab.findOne({ userId: 'test-user' });
-        if (!doc) doc = new Tab({ userId: 'test-user', tabs: [] });
-        doc.tabs.push(tabData);
-        await doc.save();
-        res.status(201).json(doc);
+        const newTab = new Tab(tabData);
+        await newTab.save();
+        res.status(201).json(newTab);
       } catch (err) {
+        if (err.code === 13113) {
+            return res.status(413).send('File is too large (max 16MB)');
+        }
         res.status(500).json({ error: err.message });
       }
     })();
@@ -40,7 +46,6 @@ router.post('/tabs', (req, res) => {
   });
 
   busboy.on('file', (fieldname, file, filename) => {
-    fileName = filename;
     const chunks = [];
     file.on('data', chunk => chunks.push(chunk));
     file.on('end', () => {
@@ -50,105 +55,79 @@ router.post('/tabs', (req, res) => {
   });
 
   busboy.on('finish', done);
-  busboy.on('error', (err) => {
-    if (!finished) {
-      finished = true;
-      res.status(500).json({ error: 'Upload failed' });
-    }
-  });
-
   req.pipe(busboy);
 });
 
 // GET ALL TABS
 router.get('/tabs', async (req, res) => {
-  const doc = await Tab.findOne({ userId: 'test-user' });
-  res.json(doc ? doc.tabs : []);
+  // Find all tabs for our test-user. We explicitly EXCLUDE fileData here for performance.
+  const tabs = await Tab.find({ userId: 'test-user' }).select('-fileData');
+  res.json(tabs);
 });
 
-// DELETE TAB
-router.delete('/tabs/:idx', async (req, res) => {
-  const idx = parseInt(req.params.idx);
-  const doc = await Tab.findOne({ userId: 'test-user' });
-  if (!doc || !doc.tabs[idx]) return res.status(404).json({ error: 'not found' });
-  doc.tabs.splice(idx, 1);
-  await doc.save();
-  res.json(doc.tabs);
-});
-
-// GET FILE
-router.get('/tabs/:idx/file', async (req, res) => {
-  const idx = parseInt(req.params.idx);
-  const doc = await Tab.findOne({ userId: 'test-user' });
-  const tab = doc?.tabs[idx];
-  if (!tab?.fileData) return res.status(404).json({ error: 'no file' });
-
-  const mimeTypes = {
-    excel: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-    powerpoint: 'application/vnd.openxmlformats-officedocument.presentationml.presentation',
-    docs: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
-  };
-  res.set('Content-Type', mimeTypes[tab.type] || 'application/octet-stream');
-  res.send(tab.fileData);
-});
-
-// PATCH TAB (SAVE googleSlideId, name, etc.)
-router.patch('/tabs/:idx', async (req, res) => {
-  const idx = parseInt(req.params.idx);
-  const { updates } = req.body;
-
+// DELETE TAB BY ID
+router.delete('/tabs/:id', async (req, res) => {
   try {
-    const doc = await Tab.findOne({ userId: 'test-user' });
-    if (!doc || !doc.tabs[idx]) return res.status(404).json({ error: 'not found' });
-
-    // SUPPORT googleSlideId
-    if (updates.googleSlideId !== undefined) {
-      doc.tabs[idx].googleSlideId = updates.googleSlideId;
-      
-      // ** RECOMMENDED ADDITION **
-      // If we just saved a googleSlideId, we don't need the raw file anymore.
-      if (updates.googleSlideId) {
-        doc.tabs[idx].fileData = undefined; // Clear the file buffer
-      }
-    }
-    if (updates.name) doc.tabs[idx].name = updates.name;
-    if (updates.content) doc.tabs[idx].content = updates.content;
-    
-    // This line is now only for Excel/Docs, not PowerPoint
-    if (updates.fileData) doc.tabs[idx].fileData = updates.fileData;
-
-    await doc.save();
-    res.json(doc.tabs[idx]);
+    const tab = await Tab.findByIdAndDelete(req.params.id);
+    if (!tab) return res.status(404).json({ error: 'not found' });
+    res.json({ message: 'success' });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
 });
-// DOWNLOAD FROM GOOGLE SLIDES
-router.get('/tabs/:idx/download', async (req, res) => {
-  const idx = parseInt(req.params.idx);
-  const doc = await Tab.findOne({ userId: 'test-user' });
-  const tab = doc?.tabs[idx];
-  if (!tab?.googleSlideId) return res.status(404).json({ error: 'No Google Slide' });
 
-  const url = `https://docs.google.com/presentation/d/${tab.googleSlideId}/export/pptx`;
-  res.redirect(url);
-});
-
-// OPTIONAL: ONLYOFFICE SAVE (if you still use it)
-router.post('/save-pptx/:index', async (req, res) => {
-  const index = parseInt(req.params.index);
-  const { url } = req.body;
-
+// --- THIS IS THE FIX ---
+// GET FILE BY ID
+router.get('/tabs/:id/file', async (req, res) => {
   try {
-    const response = await fetch(url);
-    const buffer = await response.buffer();
-    const doc = await Tab.findOne({ userId: 'test-user' });
-    if (!doc || !doc.tabs[index]) return res.status(404).send('Not found');
-    doc.tabs[index].fileData = buffer;
-    await doc.save();
-    res.json({ status: 'saved' });
+    // We must explicitly select to INCLUDE the fileData buffer
+    const tab = await Tab.findById(req.params.id).select('+fileData');
+    
+    if (!tab || !tab.fileData) { // Check if tab or fileData is missing
+      return res.status(404).json({ error: 'no file found' });
+    }
+
+    const mimeTypes = {
+      excel: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+      powerpoint: 'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+      docs: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+    };
+    res.set('Content-Type', mimeTypes[tab.type] || 'application/octet-stream');
+    res.send(tab.fileData);
   } catch (err) {
-    res.status(500).json({ error: 'Save failed' });
+    console.error("Error fetching file:", err);
+    res.status(500).json({ error: err.message });
+  }
+});
+// --- END OF FIX ---
+
+// PATCH TAB BY ID
+router.patch('/tabs/:id', async (req, res) => {
+  const { updates } = req.body;
+  try {
+    const tab = await Tab.findById(req.params.id);
+    if (!tab) return res.status(404).json({ error: 'not found' });
+
+    if (updates.googleSlideId !== undefined) {
+      tab.googleSlideId = updates.googleSlideId;
+      // After conversion, we can clear the large buffer to save space
+      tab.fileData = undefined; 
+    }
+    if (updates.googleSheetId !== undefined) {
+      tab.googleSheetId = updates.googleSheetId;
+      // After conversion, we can clear the large buffer to save space
+      tab.fileData = undefined;
+    }
+    if (updates.name) tab.name = updates.name;
+    if (updates.content) tab.content = updates.content;
+    
+    // This is for saving manual changes from other editors
+    if (updates.fileData) tab.fileData = updates.fileData;
+
+    await tab.save();
+    res.json(tab);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
   }
 });
 
