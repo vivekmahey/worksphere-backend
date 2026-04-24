@@ -1,8 +1,9 @@
+// worksphere-backend/routes/tabs.js
 const express = require('express');
 const router = express.Router();
 const Busboy = require('busboy');
 const fetch = require('node-fetch');
-const Tab = require('../models/Tab'); // Our Tab model
+const Tab = require('../models/Tab');
 
 // POST A NEW TAB
 router.post('/tabs', (req, res) => {
@@ -15,7 +16,6 @@ router.post('/tabs', (req, res) => {
   const done = () => {
     if (finished) return;
     finished = true;
-
     if (!name || !type) return res.status(400).json({ error: 'Name and type required' });
 
     const tabData = {
@@ -60,7 +60,6 @@ router.post('/tabs', (req, res) => {
 
 // GET ALL TABS
 router.get('/tabs', async (req, res) => {
-  // Find all tabs for our test-user. We explicitly EXCLUDE fileData here for performance.
   const tabs = await Tab.find({ userId: 'test-user' }).select('-fileData');
   res.json(tabs);
 });
@@ -76,17 +75,30 @@ router.delete('/tabs/:id', async (req, res) => {
   }
 });
 
-// --- THIS IS THE FIX ---
-// GET FILE BY ID
+// --- THIS ROUTE IS THE FIX ---
+// GET A SINGLE TAB (for the Docs Editor)
+router.get('/tabs/:id', async (req, res) => {
+  try {
+    // Find the tab and include its 'content' and 'fileData'
+    const tab = await Tab.findById(req.params.id).select('+content +fileData');
+    if (!tab) {
+      return res.status(404).json({ error: 'no tab found' });
+    }
+    res.json(tab); // Send the full tab data back
+  } catch (err) {
+    console.error("Error fetching tab:", err);
+    res.status(500).json({ error: err.message });
+  }
+});
+// --- END OF NEW ROUTE ---
+
+// GET FILE BY ID (for PowerPoint/Excel)
 router.get('/tabs/:id/file', async (req, res) => {
   try {
-    // We must explicitly select to INCLUDE the fileData buffer
     const tab = await Tab.findById(req.params.id).select('+fileData');
-    
-    if (!tab || !tab.fileData) { // Check if tab or fileData is missing
+    if (!tab || !tab.fileData) { 
       return res.status(404).json({ error: 'no file found' });
     }
-
     const mimeTypes = {
       excel: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
       powerpoint: 'application/vnd.openxmlformats-officedocument.presentationml.presentation',
@@ -99,7 +111,6 @@ router.get('/tabs/:id/file', async (req, res) => {
     res.status(500).json({ error: err.message });
   }
 });
-// --- END OF FIX ---
 
 // PATCH TAB BY ID
 router.patch('/tabs/:id', async (req, res) => {
@@ -110,18 +121,18 @@ router.patch('/tabs/:id', async (req, res) => {
 
     if (updates.googleSlideId !== undefined) {
       tab.googleSlideId = updates.googleSlideId;
-      // After conversion, we can clear the large buffer to save space
       tab.fileData = undefined; 
     }
     if (updates.googleSheetId !== undefined) {
       tab.googleSheetId = updates.googleSheetId;
-      // After conversion, we can clear the large buffer to save space
       tab.fileData = undefined;
     }
     if (updates.name) tab.name = updates.name;
-    if (updates.content) tab.content = updates.content;
-    
-    // This is for saving manual changes from other editors
+    // Make sure we can save 'content' (which will be HTML from Quill)
+    if (updates.content !== undefined) {
+      tab.content = updates.content;
+      tab.fileData = undefined; // Clear the file buffer if we save text
+    }
     if (updates.fileData) tab.fileData = updates.fileData;
 
     await tab.save();

@@ -1,7 +1,6 @@
 // worksphere-backend/models/Tab.js
 const mongoose = require('mongoose');
 
-// This is no longer a User schema. This is a Tab schema.
 // Each tab will be its own document.
 const tabSchema = new mongoose.Schema({
   userId: { type: String, required: true, default: 'test-user' }, // To know who owns it
@@ -14,6 +13,7 @@ const tabSchema = new mongoose.Schema({
   fileData: { type: Buffer }, // For uploaded files
   content: { type: String }, // For editor content
   googleSlideId: { type: String },
+  googleSheetId: { type: String }, // For Excel files
   status: { type: String, enum: ['active', 'done'], default: 'active' },
 });
 
