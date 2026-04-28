@@ -1,7 +1,15 @@
-const express=require('express');
-const router=express.Router();
-const Busboy=require('busboy');
-const Tab=require('../models/Tab');
+const express = require('express');
+const router = express.Router();
+const Busboy = require('busboy');
+const Tab = require('../models/Tab');
+
+const libre = require('libreoffice-convert');
+const util = require('util');
+
+const convertAsync = util.promisify(
+  libre.convert
+);
+
 
 
 /* --------------------------
@@ -10,7 +18,14 @@ CREATE TAB
 
 router.post('/tabs',(req,res)=>{
 
-console.log('UPLOAD STARTED');
+let responded=false;
+
+const safeReply=(code,data)=>{
+if(responded) return;
+responded=true;
+return res.status(code).json(data);
+};
+
 
 const busboy=Busboy({
 headers:req.headers,
@@ -24,22 +39,19 @@ let name='';
 let type='';
 let mimeType='';
 let chunks=[];
-let fileReceived=false;
-let finished=false;
+
 
 
 const saveTab=async()=>{
 
-if(finished) return;
-finished=true;
-
 try{
 
 if(!name || !type){
-return res.status(400).json({
+return safeReply(400,{
 error:'Name and type required'
 });
 }
+
 
 const tabData={
 userId:'test-user',
@@ -49,41 +61,124 @@ status:'active'
 };
 
 
-if(fileReceived){
+
+if(chunks.length){
 
 const fileBuffer=
 Buffer.concat(chunks);
 
-tabData.fileData=fileBuffer;
 
-/* store uploaded mime */
-tabData.mimeType=mimeType;
+
+/* -------------------------
+PDF -> convert into DOCX
+------------------------- */
+
+if(
+mimeType==='application/pdf' ||
+name.toLowerCase().endsWith('.pdf')
+){
+
+console.log(
+'Converting PDF to DOCX...'
+);
+
+try{
+
+const convertedDocx=
+await convertAsync(
+fileBuffer,
+'.docx',
+undefined
+);
+
+/*
+store converted file
+so DocsEditor treats it
+like editable word
+*/
+
+tabData.fileData=
+convertedDocx;
+
+tabData.type='docs';
+
+tabData.mimeType=
+'application/vnd.openxmlformats-officedocument.wordprocessingml.document';
+
+console.log(
+'PDF converted successfully'
+);
 
 }
+
+catch(convErr){
+
+console.error(
+'Conversion failed:',
+convErr
+);
+
+/*
+fallback:
+store original pdf
+if conversion fails
+*/
+
+tabData.fileData=
+fileBuffer;
+
+tabData.type='pdf';
+
+tabData.mimeType=
+'application/pdf';
+
+}
+
+}
+
+else{
+
+tabData.fileData=
+fileBuffer;
+
+tabData.mimeType=
+mimeType;
+
+}
+
+}
+
+
 
 const newTab=
 new Tab(tabData);
 
 await newTab.save();
 
-res.status(201).json(newTab);
+safeReply(
+201,
+newTab
+);
 
 }
 
 catch(err){
 
-console.error(err);
+console.error(
+'UPLOAD ERROR:',
+err
+);
 
 if(
 err.code===13113 ||
 err.message.includes('16MB')
 ){
-return res.status(413).json({
+return safeReply(413,{
 error:'File exceeds Mongo limit'
 });
 }
 
-res.status(500).json({
+safeReply(500,{
 error:err.message
 });
 
@@ -114,8 +209,6 @@ busboy.on(
 'file',
 (field,file,info)=>{
 
-fileReceived=true;
-
 mimeType=
 info.mimeType || '';
 
@@ -139,7 +232,7 @@ Buffer.from(chunk)
 file.on(
 'limit',
 ()=>{
-return res.status(413).json({
+safeReply(413,{
 error:'File too large'
 });
 }
@@ -147,19 +240,9 @@ error:'File too large'
 
 
 file.on(
-'end',
-()=>{
-console.log(
-'File stream ended'
-);
-}
-);
-
-
-file.on(
 'error',
 (err)=>{
-return res.status(500).json({
+safeReply(500,{
 error:err.message
 });
 }
@@ -181,8 +264,6 @@ req.pipe(busboy);
 
 
 
-
-
 /* --------------------------
 GET ALL TABS
 -------------------------- */
@@ -197,8 +278,6 @@ userId:'test-user'
 res.json(tabs);
 
 });
-
-
 
 
 
@@ -237,8 +316,6 @@ error:err.message
 
 
 
-
-
 /* --------------------------
 GET FILE
 -------------------------- */
@@ -262,14 +339,12 @@ error:'No file found'
 }
 
 
-
 const fileName=
 (tab.name||'')
 .toLowerCase();
 
 let contentType=
 'application/octet-stream';
-
 
 
 if(tab.type==='excel'){
@@ -289,31 +364,25 @@ contentType=
 }
 
 else if(
-tab.type==='docs' ||
 tab.type==='pdf'
-){
-
-if(
-tab.mimeType==='application/pdf' ||
-fileName.endsWith('.pdf')
 ){
 
 contentType=
 'application/pdf';
 
 }
-else{
+
+else if(
+tab.type==='docs'
+){
 
 contentType=
 'application/vnd.openxmlformats-officedocument.wordprocessingml.document';
 
 }
 
-}
 
 
-
-/* force browser preview */
 res.set(
 'Content-Disposition',
 'inline'
@@ -342,9 +411,6 @@ error:err.message
 
 
 
-
-
-
 /* --------------------------
 PATCH
 -------------------------- */
@@ -367,39 +433,17 @@ error:'Not found'
 }
 
 
+if(updates.content!==undefined){
 
-if(
-updates.googleSlideId!==undefined
-){
-tab.googleSlideId=
-updates.googleSlideId;
-
-tab.fileData=undefined;
-}
-
-
-
-if(
-updates.googleSheetId!==undefined
-){
-tab.googleSheetId=
-updates.googleSheetId;
-
-tab.fileData=undefined;
-}
-
-
-
-if(
-updates.content!==undefined
-){
 tab.content=
 updates.content;
 
-/* after editing store html */
+/*
+after edit save html
+*/
 tab.fileData=undefined;
-}
 
+}
 
 
 if(updates.name){
@@ -422,9 +466,6 @@ error:err.message
 }
 
 });
-
-
-
 
 
 
@@ -457,4 +498,4 @@ error:err.message
 });
 
 
-module.exports=router;
+module.exports=router;  
