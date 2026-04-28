@@ -34,7 +34,6 @@ let mimeType='';
 let chunks=[];
 
 
-
 const saveTab=async()=>{
 
 try{
@@ -53,11 +52,9 @@ status:'active'
 };
 
 
-
 if(chunks.length){
 
 const fileBuffer=Buffer.concat(chunks);
-
 
 
 /* -----------------------------
@@ -244,7 +241,6 @@ error:err.message
 };
 
 
-
 busboy.on(
 'field',
 (field,val)=>{
@@ -259,7 +255,6 @@ type=val;
 
 }
 );
-
 
 
 busboy.on(
@@ -299,7 +294,6 @@ saveTab
 req.pipe(busboy);
 
 });
-
 
 
 
@@ -378,7 +372,6 @@ content:''
 }
 
 
-
 const tab=
 new Tab({
 userId:'test-user',
@@ -404,7 +397,6 @@ error:err.message
 
 }
 );
-
 
 
 
@@ -527,7 +519,7 @@ error:err.message
 
 
 /* --------------------------
-PATCH
+PATCH  (FIXED)
 -------------------------- */
 
 router.patch('/tabs/:id',async(req,res)=>{
@@ -541,16 +533,37 @@ await Tab.findById(
 req.params.id
 );
 
+
+/*
+ONLY docs editor clears binary
+DO NOT wipe uploaded ppt/xlsx/pdf
+*/
+
 if(updates.content!==undefined){
+
 tab.content=
 updates.content;
+
+if(tab.type==='docs'){
 tab.fileData=undefined;
 }
+
+}
+
 
 if(updates.name){
 tab.name=
 updates.name;
 }
+
+
+if(
+updates.googleSlideId!==undefined
+){
+tab.googleSlideId=
+updates.googleSlideId;
+}
+
 
 await tab.save();
 
