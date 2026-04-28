@@ -7,10 +7,10 @@ const Tab = require('../models/Tab');
 
 
 /* --------------------------
-CREATE TAB
+CREATE TAB (UPLOAD)
 -------------------------- */
 
-router.post('/tabs', (req,res)=>{
+router.post('/tabs',(req,res)=>{
 
 let responded=false;
 
@@ -59,9 +59,9 @@ if(chunks.length){
 const fileBuffer=Buffer.concat(chunks);
 
 
+
 /* -----------------------------
-IF PDF -> convert to DOCX using
-CloudConvert preserving layout
+PDF -> CloudConvert to DOCX
 ----------------------------- */
 
 if(type==='pdf'){
@@ -69,9 +69,6 @@ if(type==='pdf'){
 try{
 
 console.log('Uploading PDF to CloudConvert...');
-
-
-/* Step 1 Create job */
 
 const job=await axios.post(
 'https://api.cloudconvert.com/v2/jobs',
@@ -108,8 +105,6 @@ t=>t.name==='import-file'
 );
 
 
-/* Step 2 Upload file */
-
 const uploadForm=
 new FormData();
 
@@ -134,20 +129,9 @@ headers:uploadForm.getHeaders()
 );
 
 
-console.log(
-'Waiting for conversion...'
-);
-
-
-/* Step 3 wait for conversion */
-
 let finishedJob;
 
-for(
-let i=0;
-i<20;
-i++
-){
+for(let i=0;i<20;i++){
 
 await new Promise(r=>
 setTimeout(r,3000)
@@ -184,8 +168,6 @@ const downloadUrl=
 exportTask.result.files[0].url;
 
 
-/* Step 4 download converted DOCX */
-
 const converted=
 await axios.get(
 downloadUrl,
@@ -194,11 +176,6 @@ responseType:'arraybuffer'
 }
 );
 
-
-/*
-Store as docs so DocsEditor
-opens it like Word
-*/
 
 tabData.fileData=
 Buffer.from(
@@ -223,9 +200,6 @@ console.error(
 err.response?.data || err.message
 );
 
-
-/* fallback store original pdf */
-
 tabData.fileData=fileBuffer;
 tabData.type='pdf';
 tabData.mimeType='application/pdf';
@@ -244,6 +218,7 @@ tabData.mimeType=mimeType;
 }
 
 
+
 const newTab=
 new Tab(tabData);
 
@@ -258,10 +233,7 @@ newTab
 
 catch(err){
 
-console.error(
-'UPLOAD ERROR:',
-err
-);
+console.error(err);
 
 safeReply(500,{
 error:err.message
@@ -330,6 +302,113 @@ req.pipe(busboy);
 
 
 
+
+
+/* --------------------------
+NEW BLANK TEMPLATES
+-------------------------- */
+
+router.post(
+'/tabs/blank',
+async(req,res)=>{
+
+try{
+
+const {
+name,
+type,
+template
+}=req.body;
+
+
+let starterContent='';
+
+
+if(template==='Blank Document'){
+starterContent=
+'<h1>Untitled Document</h1><p>Start typing...</p>';
+}
+
+else if(template==='Meeting Notes'){
+starterContent=
+'<h1>Meeting Notes</h1><ul><li>Agenda</li><li>Discussion</li><li>Action Items</li></ul>';
+}
+
+else if(template==='Project Report'){
+starterContent=
+'<h1>Project Report</h1><h2>Introduction</h2><p></p>';
+}
+
+else if(template==='Blank Spreadsheet'){
+starterContent=
+JSON.stringify([
+['','',''],
+['','',''],
+['','','']
+]);
+}
+
+else if(template==='Budget Sheet'){
+starterContent=
+JSON.stringify([
+['Item','Amount'],
+['Rent',''],
+['Utilities','']
+]);
+}
+
+else if(template==='Blank Presentation'){
+starterContent=
+JSON.stringify([
+{
+title:'New Presentation',
+content:''
+}
+]);
+}
+
+else if(template==='Pitch Deck'){
+starterContent=
+JSON.stringify([
+{
+title:'Problem Statement',
+content:''
+}
+]);
+}
+
+
+
+const tab=
+new Tab({
+userId:'test-user',
+name,
+type,
+status:'active',
+content:starterContent
+});
+
+await tab.save();
+
+res.status(201).json(tab);
+
+}
+
+catch(err){
+
+res.status(500).json({
+error:err.message
+});
+
+}
+
+}
+);
+
+
+
+
+
 /* --------------------------
 GET ALL
 -------------------------- */
@@ -363,7 +442,6 @@ req.params.id
 res.json(tab);
 
 }
-
 catch(err){
 
 res.status(500).json({
@@ -463,12 +541,9 @@ await Tab.findById(
 req.params.id
 );
 
-if(
-updates.content!==undefined
-){
+if(updates.content!==undefined){
 tab.content=
 updates.content;
-
 tab.fileData=undefined;
 }
 
