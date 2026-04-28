@@ -15,15 +15,7 @@ const tabSchema = new mongoose.Schema({
 
   type: {
     type: String,
-    enum: [
-      'excel',
-      'powerpoint',
-      'docs',
-      'pdf',
-      'notes',
-      'code',
-      'web'
-    ],
+   enum: ['excel','powerpoint','docs','pdf','notes','code','web'],
     required: true
   },
 
