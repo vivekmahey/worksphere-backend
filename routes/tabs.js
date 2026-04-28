@@ -1,187 +1,181 @@
-const express = require('express');
-const router = express.Router();
-const Busboy = require('busboy');
-const Tab = require('../models/Tab');
+const express=require('express');
+const router=express.Router();
+const Busboy=require('busboy');
+const Tab=require('../models/Tab');
 
 
 /* --------------------------
 CREATE TAB
 -------------------------- */
 
-router.post('/tabs', (req, res) => {
+router.post('/tabs',(req,res)=>{
 
-    console.log('UPLOAD STARTED');
+console.log('UPLOAD STARTED');
 
-    const busboy = Busboy({
-        headers: req.headers,
-        limits: {
-            fileSize: 15 * 1024 * 1024,
-            files: 1
-        }
-    });
+const busboy=Busboy({
+headers:req.headers,
+limits:{
+fileSize:15*1024*1024,
+files:1
+}
+});
 
-    let name = '';
-    let type = '';
-    let mimeType = '';
-    let chunks = [];
-    let fileReceived = false;
-    let finished = false;
-
-
-
-    const saveTab = async () => {
-
-        if (finished) return;
-        finished = true;
-
-        try {
-
-            if (!name || !type) {
-                return res.status(400).json({
-                    error: 'Name and type required'
-                });
-            }
-
-            const tabData = {
-                userId: 'test-user',
-                name,
-                type,
-                status: 'active'
-            };
+let name='';
+let type='';
+let mimeType='';
+let chunks=[];
+let fileReceived=false;
+let finished=false;
 
 
-            if (fileReceived) {
+const saveTab=async()=>{
 
-                const fileBuffer = Buffer.concat(chunks);
+if(finished) return;
+finished=true;
 
-                console.log(
-                    'Buffer size:',
-                    fileBuffer.length
-                );
+try{
 
-                tabData.fileData = fileBuffer;
+if(!name || !type){
+return res.status(400).json({
+error:'Name and type required'
+});
+}
 
-                /* save uploaded mime */
-                tabData.mimeType = mimeType;
+const tabData={
+userId:'test-user',
+name,
+type,
+status:'active'
+};
 
-            }
 
+if(fileReceived){
 
-            const newTab = new Tab(tabData);
+const fileBuffer=
+Buffer.concat(chunks);
 
-            await newTab.save();
+tabData.fileData=fileBuffer;
 
-            res.status(201).json(newTab);
+/* store uploaded mime */
+tabData.mimeType=mimeType;
 
-        }
+}
 
-        catch (err) {
+const newTab=
+new Tab(tabData);
 
-            console.error(
-                'UPLOAD ERROR:',
-                err
-            );
+await newTab.save();
 
-            if (
-                err.code === 13113 ||
-                err.message.includes('16MB')
-            ) {
-                return res.status(413).json({
-                    error: 'File exceeds Mongo 16MB limit'
-                });
-            }
+res.status(201).json(newTab);
 
-            res.status(500).json({
-                error: err.message
-            });
+}
 
-        }
+catch(err){
 
-    };
+console.error(err);
+
+if(
+err.code===13113 ||
+err.message.includes('16MB')
+){
+return res.status(413).json({
+error:'File exceeds Mongo limit'
+});
+}
+
+res.status(500).json({
+error:err.message
+});
+
+}
+
+};
 
 
 
-    busboy.on(
-        'field',
-        (field, val) => {
+busboy.on(
+'field',
+(field,val)=>{
 
-            if (field === 'name') {
-                name = val;
-            }
+if(field==='name'){
+name=val;
+}
 
-            if (field === 'type') {
-                type = val;
-            }
+if(field==='type'){
+type=val;
+}
 
-        }
-    );
-
-
-
-    busboy.on(
-        'file',
-        (field, file, info) => {
-
-            fileReceived = true;
-
-            /* capture uploaded mime */
-            mimeType = info.mimeType || '';
-
-            console.log(
-                'Receiving file:',
-                info.filename,
-                mimeType
-            );
-
-            file.on(
-                'data',
-                (chunk) => {
-                    chunks.push(
-                        Buffer.from(chunk)
-                    );
-                }
-            );
-
-
-            file.on(
-                'limit',
-                () => {
-                    return res.status(413).json({
-                        error: 'File too large'
-                    });
-                }
-            );
-
-
-            file.on(
-                'end',
-                () => {
-                    console.log(
-                        'File stream ended'
-                    );
-                }
-            );
-
-
-            file.on(
-                'error',
-                (err) => {
-                    return res.status(500).json({
-                        error: err.message
-                    });
-                });
-
-        }
-    );
+}
+);
 
 
 
-    busboy.on(
-        'finish',
-        saveTab
-    );
+busboy.on(
+'file',
+(field,file,info)=>{
 
-    req.pipe(busboy);
+fileReceived=true;
+
+mimeType=
+info.mimeType || '';
+
+console.log(
+'Receiving:',
+info.filename,
+mimeType
+);
+
+
+file.on(
+'data',
+(chunk)=>{
+chunks.push(
+Buffer.from(chunk)
+);
+}
+);
+
+
+file.on(
+'limit',
+()=>{
+return res.status(413).json({
+error:'File too large'
+});
+}
+);
+
+
+file.on(
+'end',
+()=>{
+console.log(
+'File stream ended'
+);
+}
+);
+
+
+file.on(
+'error',
+(err)=>{
+return res.status(500).json({
+error:err.message
+});
+}
+);
+
+}
+);
+
+
+
+busboy.on(
+'finish',
+saveTab
+);
+
+req.pipe(busboy);
 
 });
 
@@ -193,15 +187,17 @@ router.post('/tabs', (req, res) => {
 GET ALL TABS
 -------------------------- */
 
-router.get('/tabs', async (req, res) => {
+router.get('/tabs',async(req,res)=>{
 
-    const tabs = await Tab.find({
-        userId: 'test-user'
-    }).select('-fileData');
+const tabs=
+await Tab.find({
+userId:'test-user'
+}).select('-fileData');
 
-    res.json(tabs);
+res.json(tabs);
 
 });
+
 
 
 
@@ -210,32 +206,32 @@ router.get('/tabs', async (req, res) => {
 GET SINGLE TAB
 -------------------------- */
 
-router.get('/tabs/:id', async (req, res) => {
+router.get('/tabs/:id',async(req,res)=>{
 
-    try {
+try{
 
-        const tab =
-            await Tab.findById(
-                req.params.id
-            );
+const tab=
+await Tab.findById(
+req.params.id
+);
 
-        if (!tab) {
-            return res.status(404).json({
-                error: 'No tab found'
-            });
-        }
+if(!tab){
+return res.status(404).json({
+error:'No tab found'
+});
+}
 
-        res.json(tab);
+res.json(tab);
 
-    }
+}
 
-    catch (err) {
+catch(err){
 
-        res.status(500).json({
-            error: err.message
-        });
+res.status(500).json({
+error:err.message
+});
 
-    }
+}
 
 });
 
@@ -247,94 +243,103 @@ router.get('/tabs/:id', async (req, res) => {
 GET FILE
 -------------------------- */
 
-router.get('/tabs/:id/file', async (req, res) => {
+router.get('/tabs/:id/file',async(req,res)=>{
 
-    try {
+try{
 
-        const tab =
-            await Tab.findById(
-                req.params.id
-            );
+const tab=
+await Tab.findById(
+req.params.id
+);
 
-        if (
-            !tab ||
-            !tab.fileData
-        ) {
-            return res.status(404).json({
-                error: 'No file found'
-            });
-        }
-
-
-
-        /* smarter content type detection */
-
-        const fileName =
-            (tab.name || '').toLowerCase();
-
-        let contentType =
-            'application/octet-stream';
-
-
-        if (tab.type === 'excel') {
-
-            contentType =
-                'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
-
-        }
-
-        else if (
-            tab.type === 'powerpoint'
-        ) {
-
-            contentType =
-                'application/vnd.openxmlformats-officedocument.presentationml.presentation';
-
-        }
-
-        else if (
-            tab.type === 'docs' ||
-            tab.type === 'pdf'
-        ) {
-
-            if (
-                tab.mimeType === 'application/pdf' ||
-                fileName.endsWith('.pdf')
-            ) {
-
-                contentType = 'application/pdf';
-
-            }
-
-            else {
-
-                contentType =
-                    'application/vnd.openxmlformats-officedocument.wordprocessingml.document';
-
-            }
-
-        }
+if(
+!tab ||
+!tab.fileData
+){
+return res.status(404).json({
+error:'No file found'
+});
+}
 
 
 
-        res.set(
-            'Content-Type',
-            contentType
-        );
+const fileName=
+(tab.name||'')
+.toLowerCase();
 
-        res.send(tab.fileData);
+let contentType=
+'application/octet-stream';
 
-    }
 
-    catch (err) {
 
-        res.status(500).json({
-            error: err.message
-        });
+if(tab.type==='excel'){
 
-    }
+contentType=
+'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
+
+}
+
+else if(
+tab.type==='powerpoint'
+){
+
+contentType=
+'application/vnd.openxmlformats-officedocument.presentationml.presentation';
+
+}
+
+else if(
+tab.type==='docs' ||
+tab.type==='pdf'
+){
+
+if(
+tab.mimeType==='application/pdf' ||
+fileName.endsWith('.pdf')
+){
+
+contentType=
+'application/pdf';
+
+}
+else{
+
+contentType=
+'application/vnd.openxmlformats-officedocument.wordprocessingml.document';
+
+}
+
+}
+
+
+
+/* force browser preview */
+res.set(
+'Content-Disposition',
+'inline'
+);
+
+res.set(
+'Content-Type',
+contentType
+);
+
+res.send(
+tab.fileData
+);
+
+}
+
+catch(err){
+
+res.status(500).json({
+error:err.message
+});
+
+}
 
 });
+
 
 
 
@@ -344,77 +349,80 @@ router.get('/tabs/:id/file', async (req, res) => {
 PATCH
 -------------------------- */
 
-router.patch('/tabs/:id', async (req, res) => {
+router.patch('/tabs/:id',async(req,res)=>{
 
-    const { updates } = req.body;
+const {updates}=req.body;
 
-    try {
+try{
 
-        const tab =
-            await Tab.findById(
-                req.params.id
-            );
+const tab=
+await Tab.findById(
+req.params.id
+);
 
-        if (!tab) {
-            return res.status(404).json({
-                error: 'Not found'
-            });
-        }
-
-
-
-        if (
-            updates.googleSlideId !== undefined
-        ) {
-            tab.googleSlideId =
-                updates.googleSlideId;
-
-            tab.fileData = undefined;
-        }
+if(!tab){
+return res.status(404).json({
+error:'Not found'
+});
+}
 
 
-        if (
-            updates.googleSheetId !== undefined
-        ) {
-            tab.googleSheetId =
-                updates.googleSheetId;
 
-            tab.fileData = undefined;
-        }
+if(
+updates.googleSlideId!==undefined
+){
+tab.googleSlideId=
+updates.googleSlideId;
 
-
-        if (
-            updates.content !== undefined
-        ) {
-            tab.content =
-                updates.content;
-
-            /* once edited,
-            stored as rich html */
-            tab.fileData = undefined;
-        }
+tab.fileData=undefined;
+}
 
 
-        if (updates.name) {
-            tab.name = updates.name;
-        }
+
+if(
+updates.googleSheetId!==undefined
+){
+tab.googleSheetId=
+updates.googleSheetId;
+
+tab.fileData=undefined;
+}
 
 
-        await tab.save();
 
-        res.json(tab);
+if(
+updates.content!==undefined
+){
+tab.content=
+updates.content;
 
-    }
+/* after editing store html */
+tab.fileData=undefined;
+}
 
-    catch (err) {
 
-        res.status(500).json({
-            error: err.message
-        });
 
-    }
+if(updates.name){
+tab.name=
+updates.name;
+}
+
+await tab.save();
+
+res.json(tab);
+
+}
+
+catch(err){
+
+res.status(500).json({
+error:err.message
+});
+
+}
 
 });
+
 
 
 
@@ -424,29 +432,29 @@ router.patch('/tabs/:id', async (req, res) => {
 DELETE
 -------------------------- */
 
-router.delete('/tabs/:id', async (req, res) => {
+router.delete('/tabs/:id',async(req,res)=>{
 
-    try {
+try{
 
-        await Tab.findByIdAndDelete(
-            req.params.id
-        );
+await Tab.findByIdAndDelete(
+req.params.id
+);
 
-        res.json({
-            message: 'success'
-        });
+res.json({
+message:'success'
+});
 
-    }
+}
 
-    catch (err) {
+catch(err){
 
-        res.status(500).json({
-            error: err.message
-        });
+res.status(500).json({
+error:err.message
+});
 
-    }
+}
 
 });
 
 
-module.exports = router;
+module.exports=router;
