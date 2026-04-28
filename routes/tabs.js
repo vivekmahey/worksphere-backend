@@ -52,7 +52,6 @@ error:'Name and type required'
 });
 }
 
-
 const tabData={
 userId:'test-user',
 name,
@@ -61,82 +60,15 @@ status:'active'
 };
 
 
-
 if(chunks.length){
 
 const fileBuffer=
 Buffer.concat(chunks);
 
-
-
-/* -------------------------
-PDF -> convert into DOCX
-------------------------- */
-
-if(
-mimeType==='application/pdf' ||
-name.toLowerCase().endsWith('.pdf')
-){
-
-console.log(
-'Converting PDF to DOCX...'
-);
-
-try{
-
-const convertedDocx=
-await convertAsync(
-fileBuffer,
-'.docx',
-undefined
-);
-
 /*
-store converted file
-so DocsEditor treats it
-like editable word
+Store ORIGINAL file only
+(no conversion here)
 */
-
-tabData.fileData=
-convertedDocx;
-
-tabData.type='docs';
-
-tabData.mimeType=
-'application/vnd.openxmlformats-officedocument.wordprocessingml.document';
-
-console.log(
-'PDF converted successfully'
-);
-
-}
-
-catch(convErr){
-
-console.error(
-'Conversion failed:',
-convErr
-);
-
-/*
-fallback:
-store original pdf
-if conversion fails
-*/
-
-tabData.fileData=
-fileBuffer;
-
-tabData.type='pdf';
-
-tabData.mimeType=
-'application/pdf';
-
-}
-
-}
-
-else{
 
 tabData.fileData=
 fileBuffer;
@@ -145,9 +77,6 @@ tabData.mimeType=
 mimeType;
 
 }
-
-}
-
 
 
 const newTab=
@@ -317,7 +246,7 @@ error:err.message
 
 
 /* --------------------------
-GET FILE
+GET RAW FILE
 -------------------------- */
 
 router.get('/tabs/:id/file',async(req,res)=>{
@@ -338,49 +267,29 @@ error:'No file found'
 });
 }
 
-
-const fileName=
-(tab.name||'')
-.toLowerCase();
-
 let contentType=
 'application/octet-stream';
 
 
 if(tab.type==='excel'){
-
 contentType=
 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
-
 }
 
-else if(
-tab.type==='powerpoint'
-){
-
+else if(tab.type==='powerpoint'){
 contentType=
 'application/vnd.openxmlformats-officedocument.presentationml.presentation';
-
 }
 
-else if(
-tab.type==='pdf'
-){
-
+else if(tab.type==='pdf'){
 contentType=
 'application/pdf';
-
 }
 
-else if(
-tab.type==='docs'
-){
-
+else if(tab.type==='docs'){
 contentType=
 'application/vnd.openxmlformats-officedocument.wordprocessingml.document';
-
 }
-
 
 
 res.set(
@@ -412,6 +321,76 @@ error:err.message
 
 
 /* --------------------------
+PDF -> DOCX CONVERSION
+(used only for editing)
+-------------------------- */
+
+router.get(
+'/tabs/:id/convert-pdf',
+async(req,res)=>{
+
+try{
+
+const tab=
+await Tab.findById(
+req.params.id
+);
+
+if(!tab || !tab.fileData){
+return res.status(404).json({
+error:'PDF not found'
+});
+}
+
+
+if(tab.type!=='pdf'){
+return res.status(400).json({
+error:'Tab is not PDF'
+});
+}
+
+
+console.log(
+'Converting PDF to DOCX...'
+);
+
+const docxBuffer=
+await convertAsync(
+tab.fileData,
+'.docx',
+undefined
+);
+
+res.set(
+'Content-Type',
+'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
+);
+
+res.send(
+docxBuffer
+);
+
+}
+
+catch(err){
+
+console.error(
+'PDF conversion error:',
+err
+);
+
+res.status(500).json({
+error:err.message
+});
+
+}
+
+}
+);
+
+
+
+/* --------------------------
 PATCH
 -------------------------- */
 
@@ -439,7 +418,7 @@ tab.content=
 updates.content;
 
 /*
-after edit save html
+After editing save HTML
 */
 tab.fileData=undefined;
 
@@ -498,4 +477,4 @@ error:err.message
 });
 
 
-module.exports=router;  
+module.exports=router;
