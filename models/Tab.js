@@ -1,20 +1,66 @@
-// worksphere-backend/models/Tab.js
 const mongoose = require('mongoose');
 
-// Each tab will be its own document.
 const tabSchema = new mongoose.Schema({
-  userId: { type: String, required: true, default: 'test-user' }, // To know who owns it
-  name: { type: String, required: true },
+
+  userId: {
+    type: String,
+    required: true,
+    default: 'test-user'
+  },
+
+  name: {
+    type: String,
+    required: true
+  },
+
   type: {
     type: String,
-    enum: ['excel', 'powerpoint', 'docs', 'notes', 'code', 'web'],
-    required: true,
+    enum: [
+      'excel',
+      'powerpoint',
+      'docs',
+      'pdf',
+      'notes',
+      'code',
+      'web'
+    ],
+    required: true
   },
-  fileData: { type: Buffer }, // For uploaded files
-  content: { type: String }, // For editor content
-  googleSlideId: { type: String },
-  googleSheetId: { type: String }, // For Excel files
-  status: { type: String, enum: ['active', 'done'], default: 'active' },
+
+  fileData: {
+    type: Buffer
+  },
+
+  content: {
+    type: String
+  },
+
+  /* needed for pdf detection */
+  mimeType: {
+    type: String
+  },
+
+  googleSlideId: {
+    type: String
+  },
+
+  googleSheetId: {
+    type: String
+  },
+
+  status: {
+    type: String,
+    enum: [
+      'active',
+      'done'
+    ],
+    default: 'active'
+  }
+
 });
 
-module.exports = mongoose.model('Tab', tabSchema);
+module.exports =
+  mongoose.model(
+    'Tab',
+    tabSchema
+  );
